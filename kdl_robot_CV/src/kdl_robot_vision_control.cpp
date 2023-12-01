@@ -198,37 +198,40 @@ int main(int argc, char **argv)
             // look at point: compute rotation error from angle/axis
              Eigen::Matrix<double,3,1> aruco_pos_n = toEigen(cam_T_object.p); //(aruco_pose[0],aruco_pose[1],aruco_pose[2]);
             Eigen::Matrix<double,3,1> aruco_pos=aruco_pos_n;
-
+            KDL::Frame matrix_to_base=robot.getEEFrame()*cam_T_object;
              /*// look at point: compute rotation error from angle/axis
             // Get the s unitvector
             aruco_pos_n.normalize();
             // Cross product between zc and s = rotation axis 
             Eigen::Vector3d r_o = skew(Eigen::Vector3d(0,0,1))*aruco_pos_n;
             // Angle between z and s = rotation angle
-            double aruco_angle = std::acos(Eigen::Vector3d(0,1,0).dot(aruco_pos_n));
+            double aruco_angle = std::acos(Eigen::Vector3d(0,0,1).dot(aruco_pos_n));
             // Rotation matrix obtained from the rotation angle/axis
             KDL::Rotation Re = KDL::Rotation::Rot(KDL::Vector(r_o[0], r_o[1], r_o[2]), aruco_angle);
 */
              Eigen::MatrixXd eigenMatrix(3, 1); ////////////////////////////////
              eigenMatrix <<0.0, 0.0, 1.0;//////////////////////////////////////////
-             Eigen::Matrix<double,3,1> z_axis=toEigen(cam_T_object.M)*eigenMatrix;///////////////////////////////////////
+             Eigen::Matrix<double,3,1> z_axis=toEigen(matrix_to_base.M)*eigenMatrix;///////////////////////////////////////
              z_axis.normalize();/////////////////////////////////////////////////////
              z_axis=-z_axis;/////////////////////////////////////////////////
-                //   std::cout<<"x axis "<<x_axis<<std::endl;
+
+                // std::cout<<"x axis "<<x_axis<<std::endl;
                 // std::cout<<"T "<<std::endl<<cam_T_object<<std::endl;
                 // std::cout<<"M "<<std::endl<<toEigen(cam_T_object.M)<<std::endl;        DEBUG PRINT
                 // std::cout<<"p "<<std::endl<<aruco_pos_n<<std::endl;
                 // std::cout<<"x "<<std::endl<<x_axis<<std::endl;
+
             Eigen::Vector3d r_o = skew(Eigen::Vector3d(0,0,1))*z_axis;///////////////////////////////////                  
             double aruco_angle = std::acos(Eigen::Vector3d(0,0,1).dot(z_axis));//////////////////////////////////////////           
             KDL::Rotation Re = KDL::Rotation::Rot(KDL::Vector(r_o[0], r_o[1], r_o[2]), aruco_angle);///////////////////////////
+            
             //desidered position
             double offset=0.5;/////////////////////////////////////////
             aruco_pos_n.normalize();
-            Eigen::Vector3d pdc=aruco_pos-offset*aruco_pos_n;//////////////////////////////////////////////
+            Eigen::Vector3d pdc=aruco_pos+offset*aruco_pos_n;//////////////////////////////////////////////
             Eigen::Vector3d pd=toEigen(robot.getEEFrame().M)*pdc+toEigen(robot.getEEFrame().p);
             // compute errors 
-            Eigen::Matrix<double,3,1> e_o = computeOrientationError(toEigen(robot.getEEFrame().M*Re), toEigen(robot.getEEFrame().M));
+            Eigen::Matrix<double,3,1> e_o = computeOrientationError(toEigen(Re), toEigen(robot.getEEFrame().M));
             Eigen::Matrix<double,3,1> e_o_w = computeOrientationError(toEigen(Fi.M), toEigen(robot.getEEFrame().M));
             //Eigen::Matrix<double,3,1> e_p = computeLinearError(pdi,toEigen(robot.getEEFrame().p));
             Eigen::Matrix<double,3,1> e_p = computeLinearError(pd,toEigen(robot.getEEFrame().p));//////////////////////////////////
