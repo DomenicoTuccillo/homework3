@@ -1,7 +1,7 @@
 #include "kdl_ros_control/kdl_robot.h"
 #include "kdl_ros_control/kdl_control.h"
 #include "kdl_ros_control/kdl_planner.h"
-
+#include "eigen_conversions/eigen_kdl.h"
 #include "kdl_parser/kdl_parser.hpp"
 #include "urdf/model.h"
 #include <std_srvs/Empty.h>
@@ -10,11 +10,13 @@
 #include "std_msgs/Float64.h"
 #include "sensor_msgs/JointState.h"
 #include "gazebo_msgs/SetModelConfiguration.h"
-
+#include "geometry_msgs/PoseStamped.h"
 
 // Global variables
-std::vector<double> jnt_pos(7,0.0), jnt_vel(7,0.0), obj_pos(6,0.0),  obj_vel(6,0.0);
-bool robot_state_available = false;
+std::vector<double> jnt_pos(7,0.0), jnt_vel(7,0.0), obj_pos(6,0.0),  obj_vel(6,0.0),init_jnt_pos(7,0.0),aruco_pose(7,0.0);
+bool robot_state_available = false, aruco_pose_available = false;
+double lambda = 10*0.2;
+double KP = 15;
 
 // Functions
 KDLRobot createRobot(std::string robot_string)
@@ -46,6 +48,19 @@ void jointStateCallback(const sensor_msgs::JointState & msg)
     }
 }
 
+void arucoPoseCallback(const geometry_msgs::PoseStamped & msg)
+{
+    aruco_pose_available = true;
+    aruco_pose.clear();
+    aruco_pose.push_back(msg.pose.position.x);
+    aruco_pose.push_back(msg.pose.position.y);
+    aruco_pose.push_back(msg.pose.position.z);
+    aruco_pose.push_back(msg.pose.orientation.x);
+    aruco_pose.push_back(msg.pose.orientation.y);
+    aruco_pose.push_back(msg.pose.orientation.z);
+    aruco_pose.push_back(msg.pose.orientation.w);
+}
+
 // Main
 int main(int argc, char **argv)
 {
@@ -63,6 +78,7 @@ int main(int argc, char **argv)
     ros::Rate loop_rate(500);
 
     // Subscribers
+    ros::Subscriber aruco_pose_sub = n.subscribe("/aruco_single/pose", 1, arucoPoseCallback);
     ros::Subscriber joint_state_sub = n.subscribe("/iiwa/joint_states", 1, jointStateCallback);
 
     // Publishers
@@ -134,11 +150,12 @@ int main(int argc, char **argv)
     robot_init_config.request.joint_positions.push_back(-1.2);
     robot_init_config.request.joint_positions.push_back(1.57);
     robot_init_config.request.joint_positions.push_back(-1.57);
-    robot_init_config.request.joint_positions.push_back(-0.37);
+    robot_init_config.request.joint_positions.push_back(1.57);
     if(robot_set_state_srv.call(robot_init_config))
         ROS_INFO("Robot state set.");
     else
         ROS_INFO("Failed to set robot state.");
+    Eigen::VectorXd qdi = toEigen(init_jnt_pos);
 
     // Messages
     std_msgs::Float64 tau1_msg, tau2_msg, tau3_msg, tau4_msg, tau5_msg, tau6_msg, tau7_msg;
@@ -159,6 +176,7 @@ int main(int argc, char **argv)
             ROS_INFO("Failed to set robot state.");            
         
         ros::spinOnce();
+        //loop_rate.sleep();
     }
 
     // Create robot
@@ -168,9 +186,16 @@ int main(int argc, char **argv)
 
     // Specify an end-effector 
     robot.addEE(KDL::Frame::Identity());
+    
+    // // Specify an end-effector: camera in flange transform
+    KDL::Frame ee_T_cam;
+    ee_T_cam.M = KDL::Rotation::RotY(1.57)*KDL::Rotation::RotZ(-1.57);
+    ee_T_cam.p = KDL::Vector(0,0,0.025);
+    robot.addEE(ee_T_cam);
 
     // Joints
     KDL::JntArray qd(robot.getNrJnts()),dqd(robot.getNrJnts()),ddqd(robot.getNrJnts());
+    qd.data.setZero();
     dqd.data.setZero();
     ddqd.data.setZero();
 
@@ -180,6 +205,10 @@ int main(int argc, char **argv)
 
     // Update robot
     robot.update(jnt_pos, jnt_vel);
+
+    // // Retrieve initial ee pose
+    KDL::Frame Fi = robot.getEEFrame();
+    Eigen::Vector3d pdi = toEigen(Fi.p);
 
     // Init controller
     KDLController controller_(robot);
@@ -205,7 +234,7 @@ int main(int argc, char **argv)
     KDLPlanner planner(traj_duration, acc_duration, init_position, end_position,radius);
     // Retrieve the first trajectory point
     std::string profile="cubic";
-    std::string path="linear";
+    std::string path="circular";
     trajectory_point p = planner.compute_trajectory(t,profile,path);
 
     // Gains
@@ -251,8 +280,22 @@ int main(int argc, char **argv)
             }
 
             des_pose.p = KDL::Vector(p.pos[0],p.pos[1],p.pos[2]);
+            ///////////////////////
+            KDL::Jacobian J_cam = robot.getEEJacobian();
+            KDL::Frame cam_T_object(KDL::Rotation::Quaternion(aruco_pose[3], aruco_pose[4], aruco_pose[5], aruco_pose[6]), KDL::Vector(aruco_pose[0], aruco_pose[1], aruco_pose[2]));
+           
             
+            // /////////////////////////////////// CONTROLLO LOOK AT POINT PROF /////////////////////////////////////////////////
             
+            // look at point: compute rotation error from angle/axis
+            Eigen::Matrix<double,3,1> aruco_pos_n = toEigen(cam_T_object.p); //(aruco_pose[0],aruco_pose[1],aruco_pose[2]);
+            aruco_pos_n.normalize();
+            Eigen::Vector3d r_o = skew(Eigen::Vector3d(0,0,1))*aruco_pos_n;
+            double aruco_angle = std::acos(Eigen::Vector3d(0,0,1).dot(aruco_pos_n));
+            KDL::Rotation Re = KDL::Rotation::Rot(KDL::Vector(r_o[0], r_o[1], r_o[2]), aruco_angle);
+            des_pose.M=robot.getEEFrame().M*Re;
+            
+            //////////////////////
             // std::cout << "jacobian: " << std::endl << robot.getEEJacobian().data << std::endl;
             // std::cout << "jsim: " << std::endl << robot.getJsim() << std::endl;
             // std::cout << "c: " << std::endl << robot.getCoriolis().transpose() << std::endl;

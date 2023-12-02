@@ -32,7 +32,8 @@ Eigen::VectorXd KDLController::idCntr(KDL::Frame &_desPos,
                                       double _Kpp, double _Kpo,
                                       double _Kdp, double _Kdo)
 {
-   
+   // // Retrieve initial ee pose
+    KDL::Frame Fi =  robot_->getEEFrame();
    // calculate gain matrices
    Eigen::Matrix<double,6,6> Kp, Kd;
    Kp=Eigen::MatrixXd::Zero(6,6);
@@ -88,7 +89,7 @@ Eigen::VectorXd KDLController::idCntr(KDL::Frame &_desPos,
 //                                                                        omega_e,
 //                                                                        R_d,
  //                                                                       R_e);   
-    
+   Eigen::Matrix<double,3,1> e_o_w = computeOrientationError(toEigen(Fi.M), toEigen(robot_->getEEFrame().M)); 
    Eigen::Matrix<double,3,1> e_o = computeOrientationError(R_d,R_e);
    Eigen::Matrix<double,3,1> dot_e_o = computeOrientationVelocityError(omega_d,
                                                                        omega_e,
@@ -98,7 +99,7 @@ Eigen::VectorXd KDLController::idCntr(KDL::Frame &_desPos,
    //ERRORE                                                                    
    Eigen::Matrix<double,6,1> x_tilde;
    Eigen::Matrix<double,6,1> dot_x_tilde;
-   x_tilde << e_p, e_o;
+   x_tilde << e_p, e_o_w[0],e_o[1],e_o[2];
    dot_x_tilde << dot_e_p, -omega_e;//dot_e_o;
    dot_dot_x_d << dot_dot_p_d, dot_dot_r_d;
 
