@@ -317,15 +317,15 @@ int main(int argc, char **argv)
             
             dqd=robot.getInvKinVel(qd,des_cart_vel);
             // joint space inverse dynamics control
-            tau = controller_.idCntr(qd, dqd, ddqd, Kp, Kd);
+           // tau = controller_.idCntr(qd, dqd, ddqd, Kp, Kd);
             
             double Kp = 80;
-            double Ko = 80;
+            double Ko = 40;
             double Kdp = 40;
 
             // Cartesian space inverse dynamics control
-            //tau = controller_.idCntr(des_pose, des_cart_vel, des_cart_acc,
-            //                         Kp, Ko, Kdp, 2*sqrt(Ko));
+            tau = controller_.idCntr(des_pose, des_cart_vel, des_cart_acc,
+                                     Kp, Ko, Kdp, 2*sqrt(Ko));
             //CArtesian space inverse dynamics controll exploiting redundancy, we do not assign the orientation
            //  tau = controller_.idCntr(des_pose, des_cart_vel, des_cart_acc,
             //                          Kp, Kdp);                          
