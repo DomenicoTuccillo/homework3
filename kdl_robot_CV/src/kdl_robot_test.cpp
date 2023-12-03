@@ -289,7 +289,7 @@ int main(int argc, char **argv)
             KDL::Frame cam_T_object(KDL::Rotation::Quaternion(aruco_pose[3], aruco_pose[4], aruco_pose[5], aruco_pose[6]), KDL::Vector(aruco_pose[0], aruco_pose[1], aruco_pose[2]));
            
             
-            // /////////////////////////////////// CONTROLLO LOOK AT POINT PROF /////////////////////////////////////////////////
+            // /////////////////////////////////// CONTROLLO LOOK AT POINT /////////////////////////////////////////////////
             
             // look at point: compute rotation error from angle/axis
             Eigen::Matrix<double,3,1> aruco_pos_n = toEigen(cam_T_object.p); //(aruco_pose[0],aruco_pose[1],aruco_pose[2]);
@@ -299,25 +299,12 @@ int main(int argc, char **argv)
             KDL::Rotation Re = KDL::Rotation::Rot(KDL::Vector(r_o[0], r_o[1], r_o[2]), aruco_angle);
             des_pose.M=robot.getEEFrame().M*Re;
             
-            //////////////////////
-            // std::cout << "jacobian: " << std::endl << robot.getEEJacobian().data << std::endl;
-            // std::cout << "jsim: " << std::endl << robot.getJsim() << std::endl;
-            // std::cout << "c: " << std::endl << robot.getCoriolis().transpose() << std::endl;
-            // std::cout << "g: " << std::endl << robot.getGravity().transpose() << std::endl;
-            // std::cout << "qd: " << std::endl << qd.data.transpose() << std::endl;
-            // std::cout << "q: " << std::endl << robot.getJntValues().transpose() << std::endl;
-            // std::cout << "tau: " << std::endl << tau.transpose() << std::endl;
-            // std::cout << "desired_pose: " << std::endl << des_pose << std::endl;
-            // std::cout << "current_pose: " << std::endl << robot.getEEFrame() << std::endl;
-
             // inverse kinematics
             qd.data << jnt_pos[0], jnt_pos[1], jnt_pos[2], jnt_pos[3], jnt_pos[4], jnt_pos[5], jnt_pos[6];
             qd = robot.getInvKin(qd, des_pose*robot.getFlangeEE().Inverse());
-
-            
             dqd=robot.getInvKinVel(qd,des_cart_vel);
             // joint space inverse dynamics control
-           // tau = controller_.idCntr(qd, dqd, ddqd, Kp, Kd);
+            //tau = controller_.idCntr(qd, dqd, ddqd, Kp, Kd);
             
             double Kp = 80;
             double Ko = 40;
