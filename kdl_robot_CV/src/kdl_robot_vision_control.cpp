@@ -227,7 +227,7 @@ int main(int argc, char **argv)
             // Eigen::Matrix<double,3,1> e_o_w = computeOrientationError(toEigen(Fi.M), toEigen(robot.getEEFrame().M));
             // Eigen::Matrix<double,3,1> e_p = computeLinearError(toEigen(base_T_offset.p),toEigen(robot.getEEFrame().p));  
             // Eigen::Matrix<double,6,1> x_tilde; 
-            // x_tilde << e_p,  e_o[0], e_o[1], e_o[2];
+            // x_tilde << e_p,  e_o_w[0], e_o[1], e_o[2];
 
 
             // ///////////////////////////////////////  LEGGE DI CONTROLLO ///////////////////////////////////////////////////////
