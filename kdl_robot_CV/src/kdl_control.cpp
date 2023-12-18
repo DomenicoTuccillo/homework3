@@ -100,7 +100,7 @@ Eigen::VectorXd KDLController::idCntr(KDL::Frame &_desPos,
    Eigen::Matrix<double,6,1> x_tilde;
    Eigen::Matrix<double,6,1> dot_x_tilde;
    x_tilde << e_p, e_o_w[0],e_o[1],e_o[2];
-   dot_x_tilde << dot_e_p, -omega_e;//dot_e_o;
+   dot_x_tilde << dot_e_p, dot_e_o;//-omega_e;
    dot_dot_x_d << dot_dot_p_d, dot_dot_r_d;
 
    // null space control
